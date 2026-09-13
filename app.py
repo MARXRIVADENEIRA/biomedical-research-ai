@@ -609,13 +609,21 @@ with tab2:
 
     SYSTEM_BIBLIOTECOLOGO = """Eres un bibliotecólogo biomédico experto en estrategias de búsqueda para PubMed/MEDLINE.
 
+REGLA CLAVE: cuando un concepto tenga un término técnico ya establecido en la literatura internacional en inglés, úsalo en vez de traducir literalmente del español. Ejemplos: "hospitalizaciones prevenibles/evitables" casi siempre se busca como "Ambulatory Care Sensitive Conditions" (ACSC) o "preventable/avoidable hospitalizations", NO como una traducción palabra por palabra que nadie usa en la literatura. Si no estás seguro de que un concepto tenga término establecido, incluye ambas variantes (técnica + literal) unidas con OR.
+
+REGLA CLAVE 2: nunca fuerces con AND más de 3-4 conceptos a la vez — mientras más conceptos exijas simultáneamente, menos artículos existen que cumplan TODOS. Por eso debes entregar DOS ecuaciones:
+- "ecuacion_amplia": solo los 2-3 conceptos MÁS centrales (ej. condición clínica + población), sin restricción geográfica ni conceptos secundarios. Debe devolver bastantes resultados.
+- "ecuacion_especifica": todos los conceptos del tema, incluyendo el país/contexto si el usuario lo mencionó. Puede devolver pocos o cero resultados — es normal, es la búsqueda "ideal".
+
 Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional, sin markdown, sin backticks) con esta estructura exacta:
 
 {
   "conceptos_pico": ["concepto 1", "concepto 2", "..."],
   "terminos_mesh": ["\\"Termino\\"[Mesh]", "..."],
   "terminos_libres": ["termino[tiab]", "..."],
-  "ecuacion_final": "ecuación booleana completa lista para pegar en PubMed, con AND/OR/comillas/paréntesis"
+  "ecuacion_amplia": "ecuación booleana con solo los 2-3 conceptos centrales, sin restricción geográfica",
+  "ecuacion_especifica": "ecuación booleana completa con TODOS los conceptos del tema, incluyendo país/contexto si aplica",
+  "nota_terminologia": "explica brevemente si tradujiste algún concepto a un término técnico distinto del literal, y por qué"
 }"""
 
     if "resultado_mesh" not in st.session_state:
@@ -637,9 +645,24 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional, sin markdo
             st.write("**Conceptos PICO:**", ", ".join(r.get("conceptos_pico", [])))
             st.write("**Términos MeSH:**", ", ".join(r.get("terminos_mesh", [])))
             st.write("**Términos de texto libre:**", ", ".join(r.get("terminos_libres", [])))
-            st.code(r.get("ecuacion_final", ""), language="text")
+            if r.get("nota_terminologia"):
+                st.info(f"📝 {r['nota_terminologia']}")
 
-        ecuacion = r.get("ecuacion_final", "")
+        st.markdown("**Ecuación amplia** (menos restrictiva, para asegurar resultados):")
+        st.code(r.get("ecuacion_amplia", ""), language="text")
+        st.markdown("**Ecuación específica** (todos los conceptos del tema, puede dar pocos/0 resultados):")
+        st.code(r.get("ecuacion_especifica", ""), language="text")
+
+        modo_ecuacion = st.radio(
+            "¿Con cuál ecuación quieres buscar?",
+            ["Amplia (recomendado para empezar)", "Específica"],
+            horizontal=True,
+        )
+        ecuacion = (
+            r.get("ecuacion_amplia", "")
+            if modo_ecuacion.startswith("Amplia")
+            else r.get("ecuacion_especifica", "")
+        )
 
         st.divider()
         st.subheader("2️⃣ Bases de datos abiertas (gratis)")
