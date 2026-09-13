@@ -2,4 +2,6 @@ streamlit
 google-genai
 pypdf
 biopython
+pandas
+requests
  
