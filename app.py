@@ -22,7 +22,8 @@ except Exception as e:
     st.error(f"Error al inicializar Gemini: {e}")
     st.stop()
 
-MODEL_GEMINI = "gemini-2.5-pro"
+# Usamos el modelo recomendado para tareas de razonamiento avanzado y lectura amplia
+MODEL_GEMINI = "gemini-2.5-flash" 
 
 # Memoria compartida para los PDFs
 if "notebook_context" not in st.session_state:
@@ -38,7 +39,7 @@ tab1, tab2, tab3 = st.tabs([
 # MÓDULO 1: EVALUADOR CRÍTICO (GEMINI)
 # ==========================================
 with tab1:
-    st.header("Módulo 1: Lectura Crítica (Gemini 2.5 Pro)")
+    st.header("Módulo 1: Lectura Crítica (Gemini)")
     
     uploaded_files = st.file_uploader(
         "Cargue los artículos científicos en PDF", 
