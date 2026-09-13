@@ -28,11 +28,16 @@ st.set_page_config(page_title="Asistente de Investigación Biomédica", layout="
 # tenías). En vez de fijar un solo nombre, probamos una lista en orden de
 # prioridad y usamos el primero que responda. Si el día de mañana alguno de
 # estos deja de existir, la app sigue funcionando con el siguiente.
+# Google bloquea silenciosamente los modelos 2.0/2.5 para API keys NUEVAS
+# (aunque la documentación aún los liste como vigentes hasta 2026) — por
+# eso probamos primero la línea Gemini 3, y dejamos 2.5-flash al final por
+# si tu key es una cuenta antigua que sí conserva acceso a esos modelos.
 MODELOS_CANDIDATOS = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-flash-latest",
-    "gemini-2.0-flash",
 ]
 
 
