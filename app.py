@@ -145,3 +145,4 @@ with tab3:
                     st.markdown(res_redactor.text)
                 except Exception as e:
                     st.error(f"Error con Gemini API: {str(e)}")
+                    
