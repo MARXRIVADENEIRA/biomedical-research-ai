@@ -1,7 +1,6 @@
 import streamlit as st
 import anthropic
 from pypdf import PdfReader
-from Bio import Entrez
 
 # Configuración de página
 st.set_page_config(page_title="BioMedical Research AI", layout="wide", page_icon="🔬")
@@ -17,45 +16,56 @@ if not api_key:
 client = anthropic.Anthropic(api_key=api_key)
 
 # Pestañas principales de la App
-tab1, tab2, tab3 = st.tabs(["📄 Evaluador Crítico (PDF)", "🔍 Búsqueda PubMed (MeSH)", "✍️ Redactor Biomédico"])
+tab1, tab2, tab3 = st.tabs(["📄 Evaluador Crítico (Múltiples PDFs)", "🔍 Búsqueda PubMed (MeSH)", "✍️ Redactor Biomédico"])
 
 # ==========================================
-# MÓDULO 1: EVALUADOR CRÍTICO DE PDF
+# MÓDULO 1: EVALUADOR CRÍTICO DE MÚLTIPLES PDF
 # ==========================================
 with tab1:
-    st.header("Módulo 1: Lectura Crítica y Evaluación de Sesgos")
-    uploaded_file = st.file_uploader("Cargue el artículo científico (PDF)", type=["pdf"])
+    st.header("Módulo 1: Lectura Crítica y Evaluación de Sesgos (Multi-Archivo)")
+    
+    # Habilitado para subir múltiples archivos a la vez
+    uploaded_files = st.file_uploader(
+        "Cargue los artículos científicos en formato PDF (puede seleccionar varios a la vez)", 
+        type=["pdf"], 
+        accept_multiple_files=True
+    )
 
-    if uploaded_file:
-        reader = PdfReader(uploaded_file)
-        pdf_text = ""
-        for page in reader.pages:
-            pdf_text += page.extract_text() or ""
+    if uploaded_files:
+        st.success(f"Se han cargado {len(uploaded_files)} archivo(s) PDF correctamente.")
         
-        st.success(f"PDF cargado correctamente ({len(reader.pages)} páginas).")
-        
-        if st.button("Ejecutar Evaluación Metodológica"):
-            with st.spinner("Analizando diseño, pautas JBI, CARE, STROBE y detectando sesgos..."):
-                prompt = f"""
-                Eres un epidemiólogo y metodólogo experto en lectura crítica.
-                Analiza el siguiente texto de un artículo médico y genera una evaluación rigurosa:
-
-                1. Clasifica el diseño de estudio (Reporte de Caso, Serie de Casos, Cohorte, Ecológico, etc.).
-                2. Dependiendo del diseño, aplica el checklist correspondiente (JBI 8 ítems para Reporte de Caso, JBI 10 ítems para Serie de Casos, STROBE para analíticos, CARE para reportes). Muestra cada ítem y evalúa si cumple (Sí / No / No Claro / No Aplica) extrayendo la cita/evidencia textual breve del PDF que lo justifica.
-                3. Aplica los 4 dominios de Sesgo según Hassan y Wu (Selección, Diagnóstico/Verificación, Causación, Reporte).
-                4. Emite un Dictamen Final: Puntos fuertes, debilidades metodológicas y si es recomendable usarlo en una investigación.
-
-                TEXTO DEL ARTÍCULO:
-                {pdf_text[:15000]}  # Limitado para optimizar tokens
-                """
+        if st.button("Ejecutar Evaluación Metodológica Multi-Archivo"):
+            for i, uploaded_file in enumerate(uploaded_files, 1):
+                st.subheader(f"📄 Artículo {i}: {uploaded_file.name}")
                 
-                response = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=4000,
-                    messages=[{"role": "user", "content": prompt}]
-                )
+                with st.spinner(f"Procesando y analizando {uploaded_file.name}..."):
+                    reader = PdfReader(uploaded_file)
+                    pdf_text = ""
+                    for page in reader.pages:
+                        pdf_text += page.extract_text() or ""
+                    
+                    prompt = f"""
+                    Eres un epidemiólogo y metodólogo experto en lectura crítica.
+                    Analiza el siguiente texto extraído del archivo '{uploaded_file.name}' y genera una evaluación rigurosa:
+
+                    1. Clasifica el diseño de estudio (Reporte de Caso, Serie de Casos, Cohorte, Ecológico, Ensayo Clínico, etc.).
+                    2. Dependiendo del diseño, aplica el checklist correspondiente (JBI 8 ítems para Reporte de Caso, JBI 10 ítems para Serie de Casos, STROBE para analíticos, CARE para reportes, MInCir o CASPe). Muestra cada ítem y evalúa si cumple (Sí / No / No Claro / No Aplica) extrayendo la cita/evidencia textual breve del PDF que lo justifica.
+                    3. Aplica los 4 dominios de Sesgo según Hassan y Wu (Selección, Diagnóstico/Verificación, Causación, Reporte).
+                    4. Emite un Dictamen Final: Puntos fuertes, debilidades metodológicas y si es recomendable usarlo en una investigación.
+
+                    TEXTO DEL ARTÍCULO:
+                    {pdf_text[:15000]}
+                    """
+                    
+                    response = client.messages.create(
+                        model="claude-3-5-sonnet-latest",
+                        max_tokens=4000,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    
+                    st.markdown(response.content[0].text)
                 
-                st.markdown(response.content[0].text)
+                st.divider()
 
 # ==========================================
 # MÓDULO 2: BÚSQUEDA AVANZADA EN PUBMED
@@ -74,7 +84,7 @@ with tab2:
             """
             
             response_mesh = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-5-sonnet-latest",
                 max_tokens=1000,
                 messages=[{"role": "user", "content": prompt_mesh}]
             )
@@ -100,7 +110,7 @@ with tab3:
             """
             
             response_redaccion = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-5-sonnet-latest",
                 max_tokens=3000,
                 messages=[{"role": "user", "content": prompt_redaccion}]
             )
