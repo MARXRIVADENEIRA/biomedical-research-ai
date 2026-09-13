@@ -1,30 +1,30 @@
 import streamlit as st
-import anthropic
+from google import genai
 from pypdf import PdfReader
 
 # Configuración de la página
 st.set_page_config(page_title="BioMedical Research AI", layout="wide", page_icon="🔬")
 
 # ==========================================
-# SIDEBAR - CONFIGURACIÓN DE APIS
+# SIDEBAR - CONFIGURACIÓN DE API
 # ==========================================
 st.sidebar.title("🛠️ Configuración de API")
-anthropic_key = st.sidebar.text_input("Ingresa tu Claude (Anthropic) API Key:", type="password")
+gemini_key = st.sidebar.text_input("Ingresa tu Gemini (Google) API Key:", type="password")
 
-if not anthropic_key:
-    st.info("👈 Ingresa tu API Key de Anthropic en el panel izquierdo para comenzar.")
+if not gemini_key:
+    st.info("👈 Ingresa tu API Key de Google Gemini en el panel izquierdo para comenzar.")
     st.stop()
 
-# Inicialización del cliente de Claude
+# Inicialización del cliente de Gemini
 try:
-    claude_client = anthropic.Anthropic(api_key=anthropic_key)
+    g_client = genai.Client(api_key=gemini_key)
 except Exception as e:
-    st.error(f"Error al inicializar el cliente de Anthropic: {e}")
+    st.error(f"Error al inicializar Gemini: {e}")
     st.stop()
 
-MODEL_CLAUDE = "claude-3-5-sonnet-20240620"
+MODEL_GEMINI = "gemini-2.5-pro"
 
-# Memoria compartida para el contexto de los PDFs
+# Memoria compartida para los PDFs
 if "notebook_context" not in st.session_state:
     st.session_state["notebook_context"] = ""
 
@@ -35,13 +35,13 @@ tab1, tab2, tab3 = st.tabs([
 ])
 
 # ==========================================
-# MÓDULO 1: EVALUADOR CRÍTICO Y LECTURA
+# MÓDULO 1: EVALUADOR CRÍTICO (GEMINI)
 # ==========================================
 with tab1:
-    st.header("Módulo 1: Lectura Crítica (Claude 3.5 Sonnet)")
+    st.header("Módulo 1: Lectura Crítica (Gemini 2.5 Pro)")
     
     uploaded_files = st.file_uploader(
-        "Cargue los artículos científicos en PDF (Se guardarán en la memoria para el cuaderno de redacción)", 
+        "Cargue los artículos científicos en PDF", 
         type=["pdf"], 
         accept_multiple_files=True
     )
@@ -50,20 +50,18 @@ with tab1:
         st.success(f"Se han cargado {len(uploaded_files)} archivo(s) PDF.")
         
         if st.button("Procesar Archivos y Guardar en Contexto"):
-            # Limpiar contexto previo antes de procesar el lote actual
             st.session_state["notebook_context"] = ""
             
             for i, uploaded_file in enumerate(uploaded_files, 1):
                 st.subheader(f"📄 Artículo {i}: {uploaded_file.name}")
                 
-                with st.spinner(f"Leyendo y analizando {uploaded_file.name}..."):
+                with st.spinner(f"Analizando {uploaded_file.name} con Gemini..."):
                     try:
                         reader = PdfReader(uploaded_file)
                         pdf_text = ""
                         for page in reader.pages:
                             pdf_text += page.extract_text() or ""
                         
-                        # Guardar el texto extraído en el contexto compartido
                         st.session_state["notebook_context"] += f"\n\n--- DOCUMENTO {i}: {uploaded_file.name} ---\n" + pdf_text
                         
                         prompt = f"""
@@ -75,15 +73,14 @@ with tab1:
                         4. Dictamen Final (Fortalezas, Debilidades y Relevancia Clínica).
 
                         TEXTO DEL ARTÍCULO:
-                        {pdf_text[:120000]}
+                        {pdf_text[:150000]}
                         """
                         
-                        response = claude_client.messages.create(
-                            model=MODEL_CLAUDE,
-                            max_tokens=4000,
-                            messages=[{"role": "user", "content": prompt}]
+                        res = g_client.models.generate_content(
+                            model=MODEL_GEMINI,
+                            contents=prompt
                         )
-                        st.markdown(response.content[0].text)
+                        st.markdown(res.text)
                     except Exception as e:
                         st.error(f"Error al procesar {uploaded_file.name}: {str(e)}")
                 st.divider()
@@ -97,55 +94,41 @@ with tab2:
     
     if st.button("Generar Ecuación Booleana"):
         with st.spinner("Construyendo sintaxis MeSH..."):
-            prompt_mesh = f"""
-            Actúa como bibliotecólogo biomédico experto.
-            Genera una estrategia de búsqueda completa para PubMed sobre el siguiente tema: '{user_query}'
-            
-            Incluye:
-            1. Términos MeSH principales con sus variaciones (Entry Terms).
-            2. Términos en texto libre (tiab).
-            3. Ecuación booleana combinada con AND, OR y comillas lista para copiar y pegar en PubMed.
-            """
+            prompt_mesh = f"Actúa como bibliotecólogo biomédico experto. Genera una estrategia de búsqueda completa para PubMed sobre: '{user_query}' con términos MeSH, texto libre (tiab) y ecuación booleana con AND/OR."
             try:
-                response_mesh = claude_client.messages.create(
-                    model=MODEL_CLAUDE,
-                    max_tokens=1500,
-                    messages=[{"role": "user", "content": prompt_mesh}]
+                res_mesh = g_client.models.generate_content(
+                    model=MODEL_GEMINI,
+                    contents=prompt_mesh
                 )
-                st.markdown(response_mesh.content[0].text)
+                st.markdown(res_mesh.text)
             except Exception as e:
                 st.error(f"Error al generar ecuación: {str(e)}")
 
 # ==========================================
-# MÓDULO 3: REDACCIÓN CIENTÍFICA (CLAUDE)
+# MÓDULO 3: REDACCIÓN CIENTÍFICA (GEMINI)
 # ==========================================
 with tab3:
     st.header("Módulo 3: Redactor Basado en los PDFs Cargados")
     
-    # Verificación del contexto activo
     if st.session_state["notebook_context"]:
         st.info("📚 Cuaderno Activo: Se utilizarán los PDFs procesados en el Módulo 1 como fuente exclusiva.")
     else:
-        st.warning("⚠️ No has procesado PDFs en el Módulo 1. Ve al Módulo 1 y presiona 'Procesar Archivos' para alimentar el cuaderno.")
+        st.warning("⚠️ No has procesado PDFs en el Módulo 1.")
         
     instruccion_redaccion = st.text_area(
         "¿Qué deseas redactar?", 
         "Escribe la sección de Introducción/Justificación respondiendo a la evidencia de los PDFs cargados."
     )
     
-    if st.button("Redactar Sección con Claude"):
+    if st.button("Redactar Sección con Gemini"):
         if not st.session_state["notebook_context"]:
             st.error("No hay contexto de PDFs guardado. Procesa primero tus artículos en el Módulo 1.")
         else:
-            with st.spinner("Sintetizando información y redactando con citas..."):
+            with st.spinner("Sintetizando información..."):
                 prompt_redactor = f"""
-                Actúa como un investigador médico sénior y redactor científico.
-                Utiliza ÚNICAMENTE la siguiente BASE DE CONOCIMIENTO (extraída de los PDFs cargados) para redactar el texto solicitado.
-                
-                REGLAS ESTRICTAS:
-                - No inventes datos fuera de este texto.
-                - Incluye citas tipo Vancouver [1], [2] o por autor/año haciendo referencia explícita a los documentos cargados.
-                - Mantén un tono académico, riguroso y formal.
+                Actúa como un investigador médico sénior.
+                Utiliza ÚNICAMENTE la siguiente BASE DE CONOCIMIENTO (extraída de los PDFs) para redactar el texto solicitado.
+                Incluye citas tipo Vancouver [1], [2].
 
                 BASE DE CONOCIMIENTO:
                 {st.session_state['notebook_context']}
@@ -153,13 +136,11 @@ with tab3:
                 SOLICITUD:
                 {instruccion_redaccion}
                 """
-                
                 try:
-                    res_claude = claude_client.messages.create(
-                        model=MODEL_CLAUDE,
-                        max_tokens=4000,
-                        messages=[{"role": "user", "content": prompt_redactor}]
+                    res_redactor = g_client.models.generate_content(
+                        model=MODEL_GEMINI,
+                        contents=prompt_redactor
                     )
-                    st.markdown(res_claude.content[0].text)
+                    st.markdown(res_redactor.text)
                 except Exception as e:
-                    st.error(f"Error con Claude API: {str(e)}")
+                    st.error(f"Error con Gemini API: {str(e)}")
