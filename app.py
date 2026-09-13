@@ -22,8 +22,8 @@ except Exception as e:
     st.error(f"Error al inicializar Gemini: {e}")
     st.stop()
 
-# Usamos el modelo recomendado para tareas de razonamiento avanzado y lectura amplia
-MODEL_GEMINI = "gemini-2.5-flash" 
+# Usamos el modelo estable actual
+MODEL_GEMINI = "gemini-1.5-flash" 
 
 # Memoria compartida para los PDFs
 if "notebook_context" not in st.session_state:
